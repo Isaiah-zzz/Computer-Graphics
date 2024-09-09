@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="description" content="Cube">
+    <meta charset="utf-8">
+    <title>triangle</title>
+
+    <script id="vs" type="not-js">
+      attribute vec3 vPosition;
+      attribute vec3 vNormal;
+      attribute vec3 vColor;
+      attribute vec2 vTexCoord;
+      varying vec3 fPosition;
+      varying vec3 fColor;
+      varying vec3 fNormal;
+      varying vec2 fTexCoord;
+      uniform mat4 uMV;
+      uniform mat4 uMVP;
+			varying vec3 uPos;
+
+      void main(void) {
+        gl_Position = uMVP * vec4(vPosition, 1.0);
+        fPosition = (uMV * vec4(vPosition, 1.0)).xyz;
+        fColor = vColor;
+        fNormal = vNormal;                           
+				uPos = vPosition.xyz;
+      }
+    </script>
+
+    <script id="fs" type="not-js">
+      precision highp float;
+      varying vec3 fPosition;
+      varying vec3 fColor;
+      varying vec3 fNormal;
+      varying vec2 fTexCoord;
+      uniform mat4 uMVn;
+      uniform sampler2D texSampler1;
+      uniform sampler2D texSampler2;
+			varying vec3 uPos;
+			uniform float comp;
+			
+      const float specular = 1.5;
+      const float specular2 = 10.0;
+      const vec3  lightV    = vec3(2.0,10.0,3.0);
+      const float lightI    = 2.0;               
+      const float ambient  = 0.4;
+      const float diffuse  = 0.4;
+      const vec3  lightCol  = vec3(1.0,0.8,0.8);   
+			
+      vec2 p(vec3 lightDir, vec3 n, float lightInt, float k1,
+        float k2, float k3, float shin) {
+        vec3 s = normalize(lightDir);
+        vec3 v = normalize(-fPosition);
+        vec3 h = normalize(v+s);
+        float diffuse = k1 + k2 * lightInt * max(0.0, dot(n, s));
+        float spec =  k3 * pow(max(0.0, dot(n,h)), shin);
+        return vec2(diffuse, spec);
+      }
+			void main(void) {
+				vec2 strip = vec2(2.0,2.0);
+				if(step(1.0,mod(sqrt(pow(uPos.x,2.0)+pow(uPos.y,2.0))*comp,2.0))==1.0) {
+					strip = vec2(0.7, 0.3);
+				}
+        vec3 texColor= vec3(strip,0.3);
+        vec3 n = (uMVn * vec4(fNormal, 0.0)).xyz;
+        vec3 Color1  = p(lightV,n,0.0,0.0,0.0,specular,specular2).y*lightCol;
+        vec3 Color2 = p(lightV,n,lightI,ambient, diffuse,0.0,1.0).x*texColor;
+        gl_FragColor = vec4(Color1+Color2,1.0);
+      }
+		</script>
+
+  </head>
+
+	<body onload="start()">
+			<canvas id="mycanvas" width="500" height="500"></canvas><br>
+			<input id="slider1" type="range" min="-100" max="100" /> x
+			<input id="slider2" type="range" min="-100" max="100" /> rotate			<br>
+      <input id="slider4" type="range" min="1" max="100" /> Texture
+			<input id="slider3" type="range" min="1" max="80" /> Zoom
+			<script src="http://graphics.cs.wisc.edu/JS/twgl-full.min.js"></script>
+			<script src="main.js"></script>		
+
+	</body>
+
+</html>
