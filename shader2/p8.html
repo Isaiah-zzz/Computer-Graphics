@@ -20,11 +20,17 @@
             uniform mat4 uMV; 
             uniform mat4 uMVP;
             varying vec3 uPos;
+            uniform float time;
 
             void main(void){
                 uPos = vPosition.xyz;
-                vec4 tempPos = uMV*vec4(vPosition,1.0);
-                gl_Position = uMVP*vec4(vPosition, 1.0);
+                
+                // Simple wave displacement
+                vec3 displacedPosition = vPosition;
+                displacedPosition.y += sin(vPosition.x * 0.1 + time) * 0.1;
+                
+                vec4 tempPos = uMV*vec4(displacedPosition,1.0);
+                gl_Position = uMVP*vec4(displacedPosition, 1.0);
                 fColor = vColor.xyz;
                 fPosition = tempPos.xyz;
                 fNormal = uMVn*vNormal;
@@ -39,46 +45,110 @@
             varying vec3 fColor;
             varying vec3 fNormal;
             varying vec2 fTexCoord;
-            varying vec3 light2; //moving specular light
+            varying vec3 light2;
             uniform sampler2D texSampler1;
             uniform sampler2D texSampler2;
             uniform sampler2D texSampler3;
-            const vec3 light1 = vec3(0,0,0); //stationary light
             const vec3 lightColor1 = vec3(0.8,0.4,0.4);
             const vec3 lightColor2 = vec3(0.8,1.0,0.9);
             varying vec3 uPos;
             uniform float comp;
+            uniform float time;
+            uniform float metallic;
+            uniform float roughness;
             
-            vec2 phongReflection(vec3 light, float Ka, float Kd, float Ks, float specExp)
-            {
-                vec3 n = normalize(fNormal);
-                vec3 l = normalize(light);
-                vec3 e = normalize(-fPosition);
-                vec3 h = normalize(l+e);
-                float Ia_d = Ka + Kd*max(dot(l,n),0.0);
-                float Is = Ks*pow(max(dot(h,n),0.0),specExp);
-                return vec2(Ia_d, Is); 
+            // Simple noise function
+            float noise(vec2 st) {
+                return fract(sin(dot(st.xy, vec2(12.9898,78.233))) * 43758.5453123);
             }
+            
+            // Simple Blinn-Phong lighting
+            vec3 blinnPhong(vec3 lightDir, vec3 normal, vec3 viewDir, vec3 lightColor, vec3 diffuseColor) {
+                vec3 halfDir = normalize(lightDir + viewDir);
+                float NdotL = max(dot(normal, lightDir), 0.0);
+                float NdotH = max(dot(normal, halfDir), 0.0);
+                
+                vec3 diffuse = diffuseColor * NdotL;
+                vec3 specular = vec3(0.8) * pow(NdotH, 32.0);
+                
+                return lightColor * (diffuse + specular);
+            }
+            
             void main(void){
-
-                float texSelector=texture2D(texSampler3,fTexCoord).z;
-                vec3 texColor1=texture2D(texSampler1,fTexCoord).xyz;
-       
-                vec3 texColor;
-                vec2 strip = vec2(2.0,2.0);
-				if(step(1.0,mod(sqrt(pow(uPos.x,2.0)+pow(uPos.y,2.0))*comp,2.0))==1.0) {
-					strip = vec2(0.7, 0.3);
-				}
-                vec3 texColor2= vec3(strip,0.3);
-                if(texSelector < 0.5)
-                    texColor = texColor2;
-                else
-                    texColor = texColor1;
-
-
-                vec3 Color_ad = phongReflection(light2, 0.0, 0.9, 0.2,0.0).x*lightColor1*texColor;
-                vec3 Color_s = phongReflection(light2, 0.5,0.5, 0.8, 16.0).y*lightColor2;
-                gl_FragColor = vec4(Color_ad+Color_s, 1.0);
+                // Simple texture sampling
+                float texSelector = texture2D(texSampler3, fTexCoord).z;
+                vec3 texColor1 = texture2D(texSampler1, fTexCoord).xyz;
+                
+                // Burning stripe pattern (static)
+                vec2 strip = vec2(2.0, 2.0);
+                float stripePattern = sqrt(pow(uPos.x, 2.0) + pow(uPos.y, 2.0)) * comp;
+                
+                // Add flame-like distortion (static)
+                float flameDistortion = sin(uPos.x * 0.5) * 0.3 + 
+                                       cos(uPos.y * 0.3) * 0.2 +
+                                       sin((uPos.x + uPos.y) * 0.2) * 0.1;
+                stripePattern += flameDistortion;
+                
+                // Add static noise for burning effect
+                vec2 flameNoiseCoord = fTexCoord * 8.0;
+                float flameNoise = noise(flameNoiseCoord) * 0.4;
+                stripePattern += flameNoise;
+                
+                // Create burning stripes
+                float stripeValue = mod(stripePattern, 2.0);
+                
+                if(stripeValue < 1.0) {
+                    // Burning stripe colors - red/orange
+                    strip = vec2(1.0, 0.4); // Red with orange
+                } else {
+                    // Cooler areas - blue/black
+                    strip = vec2(0.1, 0.2);
+                }
+                
+                // Add ember particles effect (static)
+                vec2 emberCoord = fTexCoord * 12.0;
+                float emberNoise = noise(emberCoord);
+                if(emberNoise > 0.95) {
+                    strip = vec2(1.0, 0.8); // Bright ember color (red/orange)
+                }
+                
+                vec3 texColor2 = vec3(strip, 0.3);
+                vec3 texColor = mix(texColor2, texColor1, texSelector);
+                
+                // Add simple color animation
+                vec2 noiseCoord = fTexCoord * 4.0 + time * 0.1;
+                float noiseValue = noise(noiseCoord);
+                vec3 animatedColor = vec3(
+                    0.5 + 0.5 * sin(time + noiseCoord.x),
+                    0.5 + 0.5 * sin(time * 1.2 + noiseCoord.y),
+                    0.5 + 0.5 * sin(time * 0.8 + noiseCoord.x + noiseCoord.y)
+                );
+                
+                texColor = mix(texColor, animatedColor, noiseValue * 0.3);
+                
+                // Simple lighting
+                vec3 normal = normalize(fNormal);
+                vec3 viewDir = normalize(-fPosition);
+                vec3 lightDir = normalize(light2); // light2 is already a direction vector
+                
+                vec3 finalColor = vec3(0.0);
+                
+                // Ambient
+                finalColor += texColor * 0.2;
+                
+                // Blinn-Phong lighting
+                vec3 lighting = blinnPhong(lightDir, normal, viewDir, lightColor2, texColor);
+                finalColor += lighting;
+                
+                // Simple rim lighting
+                float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+                rim = pow(rim, 2.0);
+                finalColor += rim * vec3(0.2, 0.4, 0.8) * 0.3;
+                
+                // Simple tone mapping
+                finalColor = finalColor / (finalColor + vec3(1.0));
+                
+                gl_FragColor = vec4(finalColor, 1.0);
             }
         </script>
         <script src="p8.js"></script>

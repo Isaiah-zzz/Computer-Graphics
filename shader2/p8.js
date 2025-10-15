@@ -47,6 +47,7 @@ function setup(){
     shaderProgram.MVnormalMatrix = gl.getUniformLocation(shaderProgram, "uMVn");
     shaderProgram.movingLight = gl.getUniformLocation(shaderProgram, "rawLight");
     var locationOfComp = gl.getUniformLocation(shaderProgram, "comp");
+    var locationOfTime = gl.getUniformLocation(shaderProgram, "time");
     // Attach samplers to texture units
     shaderProgram.texSampler1 = gl.getUniformLocation(shaderProgram, "texSampler1");
     gl.uniform1i(shaderProgram.texSampler1, 0);
@@ -246,6 +247,7 @@ function setup(){
         t = t + .1;
         window.requestAnimationFrame(draw);
         gl.uniform1f(locationOfComp, slider3.value);
+        gl.uniform1f(locationOfTime, t);
         var angleCamera = t*0.01*Math.PI;
         var lightDir = slider1.value*0.01*Math.PI;
         var angleRotate = slider2.value*0.01*Math.PI;
